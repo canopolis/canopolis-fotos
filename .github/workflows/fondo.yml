@@ -1,0 +1,34 @@
+# canopolis.info: quita el fondo de la foto del animal (BiRefNet completo) y la devuelve con candado al sitio.
+# La foto nunca se guarda aqui ni sale en el historial: llega y vuelve cerrada con la llave LLAVE (secreto).
+name: fondo
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: trabajo
+        required: true
+run-name: foto
+jobs:
+  fondo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Memoria extra
+        run: sudo fallocate -l 10G /mnt/swap2 && sudo chmod 600 /mnt/swap2 && sudo mkswap /mnt/swap2 >/dev/null && sudo swapon /mnt/swap2
+      - name: Instalar
+        run: pip install -q onnxruntime numpy pillow cryptography requests
+      - name: Modelo guardado
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: m.onnx
+          key: birefnet-general-epoch-244
+      - name: Bajar BiRefNet completo
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: curl -sfL -o m.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-epoch_244.onnx
+      - name: Quitar fondo
+        env:
+          JOB: ${{ inputs.job }}
+          LLAVE: ${{ secrets.LLAVE }}
+        run: python proceso.py
