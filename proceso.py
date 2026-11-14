@@ -6,7 +6,7 @@ from PIL import Image, ImageOps
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-SITIO = "https://canopolis.info/fotocola/"
+SITIO = "https://www.canopolis.info/fotocola/"
 job = os.environ.get("JOB", "")
 llave = os.environ.get("LLAVE", "").strip()
 if not re.fullmatch(r"[A-Za-z0-9\-]{10,80}", job) or not llave:
