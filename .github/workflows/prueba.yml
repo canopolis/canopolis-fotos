@@ -1,0 +1,16 @@
+name: prueba
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Memoria del equipo
+        run: free -h; nproc
+      - name: Instalar
+        run: pip install -q onnxruntime numpy
+      - name: Bajar BiRefNet completo
+        run: curl -sL -o m.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-epoch_244.onnx && ls -la m.onnx
+      - name: Prueba con imagen de relleno (sin fotos de clientes)
+        run: |
+          printf "import onnxruntime as o,numpy as n,time\ns=o.InferenceSession('m.onnx',providers=['CPUExecutionProvider'])\nx=n.random.rand(1,3,1024,1024).astype('float32')\nfor i in range(2):\n  t=time.time();s.run(None,{s.get_inputs()[0].name:x});print('SEGUNDOS',round(time.time()-t,1))\n" > t.py
+          /usr/bin/time -v python t.py 2>&1 | grep -E 'SEGUNDOS|Maximum resident'
