@@ -16,12 +16,17 @@ clave = base64.b64decode(llave)
 def firma(texto):
     return hmac.new(llave.encode(), texto.encode(), hashlib.sha256).hexdigest().upper()
 
-def abrir(d):
-    iv, c = d[:16], d[16:]
+def abrir1(iv, c):
     x = Cipher(algorithms.AES(clave), modes.CBC(iv)).decryptor()
     p = x.update(c) + x.finalize()
     u = padding.PKCS7(128).unpadder()
     return u.update(p) + u.finalize()
+
+def abrir(d):
+    try:
+        return abrir1(d[:16], d[16:])
+    except Exception:
+        return abrir1(d[16:32], d[32:])
 
 def cerrar(d):
     iv = os.urandom(16)
@@ -34,7 +39,11 @@ ts = str(int(time.time()))
 r = requests.get(SITIO + "foto.cfm", params={"job": job, "ts": ts, "firma": firma(f"foto|{job}|{ts}")}, timeout=60)
 if r.status_code != 200:
     sys.exit(f"no se pudo bajar la foto ({r.status_code})")
-img = ImageOps.exif_transpose(Image.open(io.BytesIO(abrir(r.content)))).convert("RGB")
+t = r.text
+if "INICIO" not in t or "FIN" not in t:
+    sys.exit("respuesta del sitio sin marcas")
+datos = base64.b64decode(t.split("INICIO", 1)[1].split("FIN", 1)[0].strip())
+img = ImageOps.exif_transpose(Image.open(io.BytesIO(abrir(datos)))).convert("RGB")
 
 so = ort.SessionOptions(); so.enable_cpu_mem_arena = False; so.enable_mem_pattern = False
 s = ort.InferenceSession("m.onnx", so, providers=["CPUExecutionProvider"])
