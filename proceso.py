@@ -42,7 +42,12 @@ if r.status_code != 200:
 t = r.text
 if "INICIO" not in t or "FIN" not in t:
     sys.exit("respuesta del sitio sin marcas")
-datos = base64.b64decode(t.split("INICIO", 1)[1].split("FIN", 1)[0].strip())
+# solo lo que esta entre el primer INICIO y el ULTIMO FIN; el texto cifrado puede traer "FIN" por casualidad
+payload = t.split("INICIO", 1)[1].rsplit("FIN", 1)[0]
+payload = re.sub(r"[^A-Za-z0-9+/=]", "", payload)
+payload = payload.rstrip("=")
+payload += "=" * (-len(payload) % 4)
+datos = base64.b64decode(payload)
 img = ImageOps.exif_transpose(Image.open(io.BytesIO(abrir(datos)))).convert("RGB")
 
 so = ort.SessionOptions(); so.enable_cpu_mem_arena = False; so.enable_mem_pattern = False
