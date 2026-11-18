@@ -36,27 +36,33 @@ def logo_azul(ruta, modelo):
     rgba = img.convert("RGBA")
     a0 = np.asarray(rgba)[:, :, 3] / 255.0
     rgb = np.asarray(rgba.convert("RGB")).astype(float)
-    # lo que es tinta: todo lo que no es casi blanco (el blanco del logo queda como separacion transparente)
-    claro = rgb.min(axis=2)
-    tinta = np.clip((235 - claro) / 60.0, 0, 1)
-    borde = np.concatenate([claro[0], claro[-1], claro[:, 0], claro[:, -1]])
-    a_borde = np.concatenate([a0[0], a0[-1], a0[:, 0], a0[:, -1]])
-    if a0.min() < 0.99:                        # ya trae transparencia: se respeta
-        fondo = a0
-    elif (borde > 225).mean() > 0.9:           # logo sobre fondo blanco: basta con la tinta
-        fondo = np.ones_like(a0)
-    else:                                      # fondo de foto o de color: motor de quitar fondo
-        fondo = (quitar_fondo(img, modelo) > 0.5).astype(float)
-        fondo = np.asarray(Image.fromarray((fondo * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1))) / 255.0
-    a = tinta * fondo
+    # fuerza de tinta = cuanto se aleja del blanco el canal mas oscuro (negro, colores fuertes y claros cuentan;
+    # blanco, grises claros, sombras, halos y ruido del JPG no)
+    fuerza = 255 - rgb.min(axis=2)
+    tinta = np.clip((fuerza - 70) / 45.0, 0, 1)
+    h, w = fuerza.shape
+    borde = np.concatenate([fuerza[0], fuerza[-1], fuerza[:, 0], fuerza[:, -1]])
+    if a0.min() < 0.99:                          # ya trae transparencia: se respeta
+        a = tinta * a0
+    elif (borde < 70).mean() > 0.6:              # fondo claro (blanco o gris de captura): basta con la tinta
+        a = tinta
+    else:                                        # foto sobre fondo oscuro o de color: motor de quitar fondo
+        fondo = (quitar_fondo(img, modelo) > 0.5).astype(np.uint8) * 255
+        fondo = np.asarray(Image.fromarray(fondo).filter(ImageFilter.GaussianBlur(1))) / 255.0
+        a = tinta * fondo
     a = np.where(a < 0.08, 0, a)
-    # quitar puntitos sueltos (manchas) sin tocar las formas del logo
     from scipy import ndimage
     lab, n = ndimage.label(a > 0.3)
     if n:
-        tam = ndimage.sum(np.ones_like(a), lab, range(1, n + 1))
-        chicos = np.isin(lab, np.where(tam < max(30, 0.0005 * (a > 0.3).sum()))[0] + 1)
-        a = np.where(ndimage.binary_dilation(chicos, iterations=2) & ~ndimage.binary_dilation(np.isin(lab, np.where(tam >= max(30, 0.0005 * (a > 0.3).sum()))[0] + 1), iterations=1), 0, a)
+        idx = np.arange(1, n + 1)
+        tam = ndimage.sum(np.ones_like(a), lab, idx)
+        # fuera: pedazos que tocan el borde de la imagen (restos de fondo) y puntitos sueltos
+        toca = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+        malos = [i for i, t in zip(idx, tam) if i in toca or t < max(30, 0.0005 * tam.sum())]
+        if len(malos) < n:
+            buenos = np.isin(lab, [i for i in idx if i not in malos])
+            cerca = ndimage.binary_dilation(buenos, iterations=2)
+            a = np.where(cerca, a, 0)
     m = Image.fromarray((a * 255).astype(np.uint8))
     out = Image.new("RGBA", img.size, AZUL + (0,))
     out.putalpha(m)
