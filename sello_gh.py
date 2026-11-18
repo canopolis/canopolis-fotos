@@ -46,11 +46,11 @@ if not os.path.exists(fuente):
 d = tempfile.mkdtemp()
 logo = os.path.join(d, "logo"); open(logo, "wb").write(base64.b64decode(datos["logo"]))
 salida = os.path.join(d, "sello.png")
-motor_sello.sello(logo, datos["nombre"], datos["genero"], salida, modelo="isnet.onnx", fuente=fuente)
+nombre_final = motor_sello.sello(logo, datos["nombre"], datos["genero"], salida, modelo="isnet.onnx", fuente=fuente)
 
 s = base64.b64encode(cerrar(open(salida, "rb").read())).decode()
 ts = str(int(time.time()))
 h = hashlib.sha256(s.encode()).hexdigest().upper()
-r = requests.post(SITIO + "sello_recibir.cfm", data={"job": job, "ts": ts, "sello": s, "firma": firma(f"sellorecibir|{job}|{ts}|{h}")}, timeout=120)
+r = requests.post(SITIO + "sello_recibir.cfm", data={"job": job, "ts": ts, "sello": s, "nombre": nombre_final, "firma": firma(f"sellorecibir|{job}|{ts}|{h}|{nombre_final}")}, timeout=120)
 print("listo" if r.status_code == 200 else f"el sitio respondio {r.status_code}")
 sys.exit(0 if r.status_code == 200 else 1)
