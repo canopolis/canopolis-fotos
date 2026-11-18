@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Instalar
-        run: pip install -q onnxruntime numpy pillow scipy cryptography requests
+        run: pip install -q onnxruntime numpy pillow scipy cryptography requests pyspellchecker
       - name: Modelo guardado
         id: cache
         uses: actions/cache@v4
