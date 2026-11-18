@@ -62,14 +62,7 @@ def logo_azul(ruta, modelo):
         fondo = (quitar_fondo(img, modelo) > 0.5).astype(np.uint8) * 255
         fondo = np.asarray(Image.fromarray(fondo).filter(ImageFilter.GaussianBlur(1))) / 255.0
         a = tinta * fondo
-    # 2026-11-18: si el logo tiene tinta oscura (letras) y tinta clara (dibujos), lo claro queda en azul mas suave
-    # para que las letras se distingan cuando van encima del dibujo
-    hay = a > 0.3
-    if hay.sum() > 0:
-        oscuro = (fuerza > 200) & hay
-        claro = (fuerza < 130) & hay        # solo tintas claras (pastel); los colores fuertes no se tocan
-        if oscuro.sum() > 0.05 * hay.sum() and claro.sum() > 0.05 * hay.sum():
-            a = a * np.clip((fuerza - 40) / 90.0, 0.6, 1)
+    # 2026-11-18 (Arturo): todo el sello en un solo tono, el mismo azul de las letras; no hay azul suave
     a = np.where(a < 0.08, 0, a)
     from scipy import ndimage
     lab, n = ndimage.label(a > 0.3)
