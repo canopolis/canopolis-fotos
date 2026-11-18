@@ -12,7 +12,7 @@ R_ARO = 735                  # radio del circulo fino
 G_ARO = 9                    # grueso del circulo
 R_TXT = 648                  # radio del centro de las letras
 ALTO_TXT = 74                # alto de las mayusculas
-R_LOGO = 580                 # el logo cabe dentro de este radio
+R_LOGO = 570                 # lo mas lejos que llega el logo (justo por dentro de las letras)
 ESPACIO = 0.30               # separacion entre letras (fraccion del alto)
 LIMITE = 158                 # angulo maximo que ocupa un texto
 
@@ -104,6 +104,8 @@ def texto_en_arco(lienzo, texto, fuente, arriba):
     lienzo.paste(Image.new("RGBA", (N, N), AZUL + (255,)), (0, 0), capa)
 
 def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.ttf"):
+    import ortografia
+    nombre = ortografia.corregir(" ".join(nombre.split()))
     f = ImageFont.truetype(fuente, 10)
     cap = f.getbbox("H"); f = ImageFont.truetype(fuente, int(10 * ALTO_TXT / (cap[3] - cap[1])))
     s = Image.new("RGBA", (N, N), (0, 0, 0, 0))
@@ -122,13 +124,18 @@ def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.tt
             tam *= 0.96
     lg = logo_azul(logo, modelo)
     w, h = lg.size
-    esc = R_LOGO / math.hypot(w / 2, h / 2)
+    # el logo se agranda hasta que su punto mas lejano (no la esquina de la caja) toca el borde interior de las letras
+    al = np.asarray(lg)[:, :, 3]
+    ys, xs = np.nonzero(al > 20)
+    rmax = max(np.hypot(xs - w / 2, ys - h / 2).max(), 1) if len(xs) else math.hypot(w / 2, h / 2)
+    esc = R_LOGO / rmax
     lg = lg.resize((max(1, int(w * esc)), max(1, int(h * esc))), Image.LANCZOS)
     s.alpha_composite(lg, (int(C - lg.width / 2), int(C - lg.height / 2)))
     # un solo azul puro: solo cambia la transparencia
     a = s.split()[3]
     fin = Image.new("RGBA", (N, N), AZUL + (0,)); fin.putalpha(a)
     fin.save(salida, optimize=True)
+    return nombre
 
 if False:
     sello(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])
