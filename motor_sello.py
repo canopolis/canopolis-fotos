@@ -17,7 +17,10 @@ ESPACIO = 0.30               # separacion entre letras (fraccion del alto)
 LIMITE = 158                 # angulo maximo que ocupa un texto
 
 def titulo(genero):
-    return "MÉDICA VETERINARIA" if genero.upper().startswith("F") else "MÉDICO VETERINARIO"
+    g = genero.upper()
+    if g.startswith("N"):                        # 2026-11-18: sello sin titulo abajo (ej. Canopolis)
+        return ""
+    return "MÉDICA VETERINARIA" if g.startswith("F") else "MÉDICO VETERINARIO"
 
 def mayus(t):
     return unicodedata.normalize("NFC", t.strip().upper())
@@ -72,6 +75,18 @@ def logo_azul(ruta, modelo):
         # fuera: pedazos que tocan el borde de la imagen (restos de fondo) y puntitos sueltos
         toca = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
         malos = [i for i, t in zip(idx, tam) if i in toca or t < max(30, 0.0005 * tam.sum())]
+        # 2026-11-18: restos del marco redondo del logo (rayita fina pegada al borde exterior, ej. Canopolis)
+        yy, xx = np.indices(a.shape)
+        rr = np.hypot(xx - w / 2, yy - h / 2) / (min(h, w) / 2)
+        rmin = ndimage.minimum(rr, lab, idx)
+        cajas = ndimage.find_objects(lab)
+        for i, r, t in zip(idx, rmin, tam):
+            if i in malos or r <= 0.80 or cajas[i - 1] is None:
+                continue
+            sy, sx = cajas[i - 1]
+            lleno = t / max(1, (sy.stop - sy.start) * (sx.stop - sx.start))
+            if lleno < 0.25:                     # solo rayitas finas y alargadas (no letras ni huellas)
+                malos.append(i)
         if len(malos) < n:
             buenos = np.isin(lab, [i for i in idx if i not in malos])
             cerca = ndimage.binary_dilation(buenos, iterations=2)
@@ -89,7 +104,7 @@ def letra(ch, fuente):
     ImageDraw.Draw(im).text((20, int(ALTO_TXT * 0.6)), ch, font=fuente, fill=255)
     return im, w
 
-def texto_en_arco(lienzo, texto, fuente, arriba):
+def texto_en_arco(lienzo, texto, fuente, arriba, limite=LIMITE):
     # ancho total en angulo
     tam = []
     for ch in texto:
@@ -101,7 +116,7 @@ def texto_en_arco(lienzo, texto, fuente, arriba):
     paso = ALTO_TXT * ESPACIO
     total = sum(w for _, w in tam) + paso * (len(tam) - 1)
     ang_total = total / R_TXT
-    if ang_total > math.radians(LIMITE):
+    if ang_total > math.radians(limite):
         raise ValueError("largo")
     th = (-math.pi / 2 - ang_total / 2) if arriba else (math.pi / 2 + ang_total / 2)
     capa = Image.new("L", (N, N), 0)
@@ -137,6 +152,8 @@ def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.tt
         prueba = s.copy()
         try:
             for t, arriba in ((mayus(nombre), True), (titulo(genero), False)):
+                if not t:
+                    continue
                 texto_en_arco(prueba, t, ImageFont.truetype(fuente, int(tam)), arriba)
             s = prueba; break
         except ValueError:
