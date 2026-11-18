@@ -33,6 +33,9 @@ def quitar_fondo(img, modelo):
 
 def logo_azul(ruta, modelo):
     img = ImageOps.exif_transpose(Image.open(ruta))
+    if max(img.size) < 1200:                     # 2026-11-18: logos chicos se agrandan antes de limpiar (bordes suaves, rayas finas no se pierden)
+        k = 1200.0 / max(img.size)
+        img = img.convert("RGBA").resize((int(img.width * k), int(img.height * k)), Image.LANCZOS)
     rgba = img.convert("RGBA")
     a0 = np.asarray(rgba)[:, :, 3] / 255.0
     rgb = np.asarray(rgba.convert("RGB")).astype(float)
@@ -42,14 +45,31 @@ def logo_azul(ruta, modelo):
     tinta = np.clip((fuerza - 70) / 45.0, 0, 1)
     h, w = fuerza.shape
     borde = np.concatenate([fuerza[0], fuerza[-1], fuerza[:, 0], fuerza[:, -1]])
+    rb = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]])
+    cb = np.median(rb, axis=0)
+    parejo = np.abs(rb - cb).max(axis=1).mean() < 25     # borde de un solo color
     if a0.min() < 0.99:                          # ya trae transparencia: se respeta
         a = tinta * a0
     elif (borde < 70).mean() > 0.6:              # fondo claro (blanco o gris de captura): basta con la tinta
         a = tinta
+    elif parejo:                                 # 2026-11-18: logo dentro de un marco de un solo color (ej. Clinica America):
+        from scipy import ndimage                # se quita solo ese color conectado al borde de la imagen; lo de adentro se queda
+        lab0, n0 = ndimage.label(np.abs(rgb - cb).max(axis=2) < 40)
+        toca0 = set(np.unique(np.concatenate([lab0[0], lab0[-1], lab0[:, 0], lab0[:, -1]]))) - {0}
+        fuera = ndimage.binary_dilation(np.isin(lab0, list(toca0)), iterations=max(2, int(round(min(h, w) / 100))))
+        a = np.clip((fuerza - 30) / 45.0, 0, 1) * (~fuera)   # el fondo ya se quito por forma: las rayas finas claras se conservan
     else:                                        # foto sobre fondo oscuro o de color: motor de quitar fondo
         fondo = (quitar_fondo(img, modelo) > 0.5).astype(np.uint8) * 255
         fondo = np.asarray(Image.fromarray(fondo).filter(ImageFilter.GaussianBlur(1))) / 255.0
         a = tinta * fondo
+    # 2026-11-18: si el logo tiene tinta oscura (letras) y tinta clara (dibujos), lo claro queda en azul mas suave
+    # para que las letras se distingan cuando van encima del dibujo
+    hay = a > 0.3
+    if hay.sum() > 0:
+        oscuro = (fuerza > 200) & hay
+        claro = (fuerza < 170) & hay
+        if oscuro.sum() > 0.05 * hay.sum() and claro.sum() > 0.05 * hay.sum():
+            a = a * np.clip((fuerza - 40) / 160.0, 0.6, 1)
     a = np.where(a < 0.08, 0, a)
     from scipy import ndimage
     lab, n = ndimage.label(a > 0.3)
