@@ -67,9 +67,9 @@ def logo_azul(ruta, modelo):
     hay = a > 0.3
     if hay.sum() > 0:
         oscuro = (fuerza > 200) & hay
-        claro = (fuerza < 170) & hay
+        claro = (fuerza < 130) & hay        # solo tintas claras (pastel); los colores fuertes no se tocan
         if oscuro.sum() > 0.05 * hay.sum() and claro.sum() > 0.05 * hay.sum():
-            a = a * np.clip((fuerza - 40) / 160.0, 0.6, 1)
+            a = a * np.clip((fuerza - 40) / 90.0, 0.6, 1)
     a = np.where(a < 0.08, 0, a)
     from scipy import ndimage
     lab, n = ndimage.label(a > 0.3)
