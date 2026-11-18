@@ -1,0 +1,35 @@
+# canopolis.info: arma el sello de una clinica (logo + nombre + genero) con el formato aprobado.
+# Corre en Windows porque ya trae la letra Verdana. El logo llega y el sello vuelve con candado (secreto LLAVE).
+name: sello
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: trabajo
+        required: true
+run-name: sello
+jobs:
+  sello:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar
+        run: pip install -q onnxruntime numpy pillow scipy cryptography requests
+      - name: Modelo guardado
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: isnet.onnx
+          key: isnet-general-use
+      - name: Bajar modelo
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: curl -sfL -o isnet.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx
+      - name: Armar sello
+        env:
+          JOB: ${{ inputs.job }}
+          LLAVE: ${{ secrets.LLAVE }}
+        run: python sello_gh.py
