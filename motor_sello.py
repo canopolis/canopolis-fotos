@@ -139,7 +139,7 @@ def texto_en_arco(lienzo, texto, fuente, arriba, limite=LIMITE):
 
 def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.ttf"):
     import ortografia
-    nombre = ortografia.corregir(" ".join(nombre.split()))
+    nombre = ortografia.corregir(" ".join(nombre.split())) if nombre.strip() else ""   # 2026-11-18: sin nombre = solo logo
     f = ImageFont.truetype(fuente, 10)
     cap = f.getbbox("H"); f = ImageFont.truetype(fuente, int(10 * ALTO_TXT / (cap[3] - cap[1])))
     s = Image.new("RGBA", (N, N), (0, 0, 0, 0))
@@ -151,7 +151,7 @@ def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.tt
     while True:        # mismo tamano arriba y abajo; se achica solo si alguno no cabe
         prueba = s.copy()
         try:
-            for t, arriba in ((mayus(nombre), True), (titulo(genero), False)):
+            for t, arriba in ((mayus(nombre) if nombre else "", True), (titulo(genero), False)):
                 if not t:
                     continue
                 texto_en_arco(prueba, t, ImageFont.truetype(fuente, int(tam)), arriba)
@@ -164,7 +164,7 @@ def sello(logo, nombre, genero, salida, modelo="isnet.onnx", fuente="verdanab.tt
     al = np.asarray(lg)[:, :, 3]
     ys, xs = np.nonzero(al > 20)
     rmax = max(np.hypot(xs - w / 2, ys - h / 2).max(), 1) if len(xs) else math.hypot(w / 2, h / 2)
-    esc = R_LOGO / rmax
+    esc = (R_LOGO if (nombre or titulo(genero)) else 690) / rmax   # sin letras, el logo llena el circulo
     lg = lg.resize((max(1, int(w * esc)), max(1, int(h * esc))), Image.LANCZOS)
     s.alpha_composite(lg, (int(C - lg.width / 2), int(C - lg.height / 2)))
     # un solo azul puro: solo cambia la transparencia
